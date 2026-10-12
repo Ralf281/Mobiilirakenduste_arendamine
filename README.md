@@ -127,3 +127,24 @@ Seda Capacitori pluginat kasutatakse märkmete püsivaks salvestamiseks.
 3. Capacitor Documentation. Capacitor Documentation. https://capacitorjs.com/docs
 4. MDN Web Docs. Web Components. https://developer.mozilla.org/en-US/docs/Web/API/Web_components
 5. MDN Web Docs. JavaScript Promises. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
+
+
+# Rakenduse ülesehitus ja navigeerimine
+
+Speech Notes on Ionicu ja TypeScripti abil loodud mobiilirakendus, mis võimaldab luua kõne abil märkmeid ning neid hiljem hallata. Kasutajaliideses on kolm peamist vaadet: märkmete loend, kaustade vaade ja märkme detailvaade.
+
+Märkmete ja kaustade vahel liikumiseks kasutatakse Ionicu ion-segment komponenti. Märkme kaardile vajutamisel avaneb detailvaade, kus kuvatakse märkme tekst, loomise aeg, kaust ja sõnade arv. Detailvaates saab märkme kustutada, seda muuta või liikuda tagasi märkmete vaatesse.
+
+Vaadete vahetamine toimub TypeScripti funktsiooniga showView(), mis muudab elementide nähtavust klassi ion-hide abil. Seetõttu ei laeta iga vaate jaoks eraldi HTML-lehte, vaid kõik vaated asuvad samas dokumendis.
+
+## Sündmuste käsitlemine
+
+Kasutaja tegevustele reageeritakse sündmuste kuulajate (addEventListener) abil. Näiteks salvestamisnupp käivitab funktsiooni saveDraft(), märkme muutmisnupp funktsiooni editNote() ning kustutamisnupp vastava kustutamisfunktsiooni.
+
+Kõnetuvastuse nupp käivitab või peatab kõnetuvastuse. Brauseris kasutatakse Web Speech API-t ja mobiilirakenduses Capacitori kõnetuvastuse pluginat. Tuvastatud tekst kuvatakse tekstiväljal, kus kasutaja saab seda enne salvestamist täiendada või parandada.
+
+## Andmete salvestamine
+
+Märkmed ja kaustad salvestatakse eraldi Capacitori Preferences API abil, kasutades JSON-vormingut. Rakenduse käivitamisel loeb funktsioon load() salvestatud andmed ning kuvab need kasutajaliideses. Enne andmete kasutamist kontrollitakse nende struktuuri ja vigase JSON-i korral kasutatakse tühja loendit.
+
+Kaustade ja märkmete vahelisi seoseid hallatakse folderId välja abil. Kui kaust kustutatakse, jäävad märkmed alles, kuid nende seos kustutatud kaustaga eemaldatakse.
