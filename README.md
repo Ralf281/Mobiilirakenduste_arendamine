@@ -148,3 +148,19 @@ Kõnetuvastuse nupp käivitab või peatab kõnetuvastuse. Brauseris kasutatakse 
 Märkmed ja kaustad salvestatakse eraldi Capacitori Preferences API abil, kasutades JSON-vormingut. Rakenduse käivitamisel loeb funktsioon load() salvestatud andmed ning kuvab need kasutajaliideses. Enne andmete kasutamist kontrollitakse nende struktuuri ja vigase JSON-i korral kasutatakse tühja loendit.
 
 Kaustade ja märkmete vahelisi seoseid hallatakse folderId välja abil. Kui kaust kustutatakse, jäävad märkmed alles, kuid nende seos kustutatud kaustaga eemaldatakse.
+
+## Arendamise käigus tekkinud raskused
+
+Rakenduse arendamisel tuli arvestada sellega, et kõnetuvastus peab toimima erinevates keskkondades. Brauseris kasutan Web Speech API-t, mobiilirakenduses aga Capacitori kõnetuvastuse pluginat. Seetõttu on kõnetuvastuse käivitamine ja tulemuste töötlemine eri platvormidel erinev.
+
+Teiseks tuli lahendada märkmete ja kaustade salvestamine ning nendevaheliste seoste haldamine. Näiteks kausta kustutamisel peavad selle märkmed alles jääma, kuid nende seos kustutatud kaustaga tuleb eemaldada.
+
+Rakenduse arendamisel aitas koodi jagamine eraldi funktsioonideks, näiteks saveDraft(), deleteFolder(), render() ja load(). Nii on lihtsam mõista, milline funktsioon vastutab andmete muutmise, salvestamise või kuvamise eest.
+
+## Kasutatud praktikad
+
+- **Funktsioonideks jaotamine:** rakenduse loogika on jagatud väiksemateks funktsioonideks, näiteks `showView()`, `saveDraft()` ja `deleteNote()`.
+- **Asünkroonne programmeerimine:** märgete ja kaustade laadimiseks ning salvestamiseks kasutatakse `async` ja `await` märksõnu.
+- **Andmete valideerimine:** funktsioonid `isNotes()` ja `isFolders()` kontrollivad laaditud andmete struktuuri enne nende kasutamist.
+- **Sündmuspõhine programmeerimine:** kasutaja tegevustele reageeritakse `addEventListener()` abil.
+- **Platvormide eristamine:** `Capacitor.isNativePlatform()` abil valitakse brauseri või mobiilirakenduse kõnetuvastuse lahendus.
