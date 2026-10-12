@@ -69,6 +69,13 @@ Märkmete loendis oleva kaardi klõps käivitab `openDetail` funktsiooni ([`main
 
 Detailvaates oleva nupu „Kõik märkused“ klõps kuvab taas märkmete vaate. Nupud „Muuda“ ja „Kustuta“ viivad samuti esmalt märkmete vaatesse ning käivitavad seejärel vastava tegevuse ([`index.html`](../speech-notes/index.html#L84-L109), [`main.ts`](../speech-notes/src/main.ts#L312-L319)).
 
+## Arendamise käigus tekkinud raskused
+Rakenduse arendamisel tuli arvestada sellega, et kõnetuvastus peab toimima erinevates keskkondades. Brauseris kasutan Web Speech API-t, mobiilirakenduses aga Capacitori kõnetuvastuse pluginat. Seetõttu on kõnetuvastuse käivitamine ja tulemuste töötlemine eri platvormidel erinev.
+
+Teiseks tuli lahendada märkmete ja kaustade salvestamine ning nendevaheliste seoste haldamine. Näiteks kausta kustutamisel peavad selle märkmed alles jääma, kuid nende seos kustutatud kaustaga tuleb eemaldada.
+
+Rakenduse arendamisel aitas koodi jagamine eraldi funktsioonideks, näiteks saveDraft(), deleteFolder(), render() ja load(). Nii on lihtsam mõista, milline funktsioon vastutab andmete muutmise, salvestamise või kuvamise eest.
+
 ## Kokkuvõte
 
 - Põhivaadete vahel liigutakse `ion-segment`-i abil.
