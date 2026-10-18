@@ -67,6 +67,9 @@ const foldersView = document.getElementById('folders-view')!;
 const detailView = document.getElementById('detail-view')!;
 const segmentToolbar = document.querySelector('.segment-toolbar')!;
 
+let searchQuery = '';
+const searchbar = document.getElementById("search-bar") as HTMLIonSearchbarElement
+
 function showView(view: 'notes' | 'folders' | 'detail') {
   notesView.classList.toggle('ion-hide', view !== 'notes');
   foldersView.classList.toggle('ion-hide', view !== 'folders');
@@ -75,6 +78,7 @@ function showView(view: 'notes' | 'folders' | 'detail') {
   // folders tab: "Lisa kaust" button instead of the record button
   recordFab.classList.toggle('ion-hide', view === 'folders');
   folderFab.classList.toggle('ion-hide', view !== 'folders');
+  searchbar.value = ""
 }
 
 segment.addEventListener('ionChange', (ev: any) => {
@@ -236,8 +240,9 @@ async function deleteFolder(f: Folder) {
 
 function renderFolders() {
   foldersGrid.innerHTML = '';
-  foldersEmpty.classList.toggle('ion-hide', folders.length > 0);
-  for (const f of folders) {
+  const visibleFolders = folders.filter(folder => folder.name.toLocaleLowerCase().includes(searchQuery));
+  foldersEmpty.classList.toggle('ion-hide', visibleFolders.length > 0);
+  for (const f of visibleFolders) {
     const count = notes.filter((n) => n.folderId === f.id).length;
 
     const card = document.createElement('ion-card');
@@ -321,8 +326,11 @@ document.getElementById('detail-delete')!.addEventListener('click', () => {
 
 function render() {
   list.innerHTML = '';
-  const visible =
-    activeFolderId === null ? notes : notes.filter((n) => n.folderId === activeFolderId);
+  const visible = notes.filter(note => {
+    const matchesFolder = activeFolderId === null || note.folderId === activeFolderId;
+    const matchesSearch = note.text.toLocaleLowerCase().includes(searchQuery);
+    return matchesFolder && matchesSearch
+  });
 
   if (visible.length === 0 && activeFolderId !== null) {
     const empty = document.createElement('p');
@@ -515,6 +523,23 @@ async function saveDraft() {
   renderFolders();
 }
 
+async function showSearchbar() {
+  const searchbar = document.getElementById("search-bar")! as HTMLIonSearchbarElement;
+  if (!searchbar.classList.contains("ion-hide")) {
+    searchbar.classList.add("ion-hide");
+  }
+  else {
+    searchbar.classList.remove("ion-hide");
+  }
+}
+
+function searchTerm(term: string | null | undefined) {
+  searchQuery = (term ?? '').trim().toLocaleLowerCase();
+
+  render();
+  renderFolders();
+}
+
 btn.addEventListener('click', () => (recording ? stopRecording() : start()));
 document.getElementById('save-btn')!.addEventListener('click', saveDraft);
 document.getElementById('cancel-btn')!.addEventListener('click', () => {
@@ -528,6 +553,13 @@ document.getElementById('clear-btn')!.addEventListener('click', async () => {
   await save();
   render();
   renderFolders();
+});
+
+document.getElementById("search-btn")!.addEventListener('click', showSearchbar);
+
+searchbar.addEventListener('ionInput', (event) => {
+  const element = event.currentTarget as HTMLIonSearchbarElement
+  searchTerm(element.value)
 });
 
 load();
