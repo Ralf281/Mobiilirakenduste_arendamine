@@ -1,131 +1,241 @@
 ﻿<!DOCTYPE html>
 <html lang="et" dir="ltr">
 <head>
-<meta charset="UTF-8" />
-<meta
-name="viewport"
-content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
-/>
-<title>Speech Notes</title>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Speech Notes</title>
 </head>
+
 <body>
-<ion-app>
-<ion-header class="ion-no-border">
-<ion-toolbar>
-<ion-avatar slot="start" class="header-avatar">
-<ion-icon name="person-circle"></ion-icon>
-</ion-avatar>
-<ion-title>Speech Notes</ion-title>
-<ion-buttons slot="end">
-<ion-button id="search-btn" fill="clear">
-<ion-icon slot="icon-only" name="search"></ion-icon>
-</ion-button>
-<ion-button id="clear-btn" fill="clear">
-<ion-icon slot="icon-only" name="trash"></ion-icon>
-</ion-button>
-</ion-buttons>
-</ion-toolbar>
-<ion-toolbar class="segment-toolbar">
-<ion-segment id="view-segment" value="notes">
-<ion-segment-button id="seg-notes" value="notes">
-<ion-label>Kõik märkused</ion-label>
-</ion-segment-button>
-<ion-segment-button value="folders">
-<ion-label>Kaustad</ion-label>
-</ion-segment-button>
-</ion-segment>
-</ion-toolbar>
-</ion-header>
+  <ion-app>
+    <ion-header class="ion-no-border">
+      <ion-toolbar>
+        <ion-avatar slot="start" class="header-avatar">
+          <ion-icon name="person-circle"></ion-icon>
+        </ion-avatar>
 
-<ion-content id="main-content">
+        <ion-title>Speech Notes</ion-title>
 
-<div id="notes-view">
-<div class="editor">
-<p id="live-text"></p>
-<ion-textarea
-id="draft"
-label="Märkus"
-label-placement="stacked"
-fill="outline"
-auto-grow="true"
-rows="2"
-></ion-textarea>
+        <ion-buttons slot="end">
+          <ion-button id="search-btn" fill="clear" aria-label="Otsi">
+            <ion-icon slot="icon-only" name="search"></ion-icon>
+          </ion-button>
 
-<div class="folder-picker-wrap">
-<span class="folder-picker-label">Kaust</span>
-<div id="folder-picker" class="folder-picker"></div>
-</div>
+          <ion-button id="clear-btn" fill="clear" aria-label="Kustuta märkmed">
+            <ion-icon slot="icon-only" name="trash"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
 
-<div class="editor-actions">
-<ion-button id="save-btn" size="small">Salvesta</ion-button>
-<ion-button id="cancel-btn" size="small" fill="outline">Tühista</ion-button>
-</div>
-</div>
+      <ion-toolbar class="segment-toolbar">
+        <ion-segment id="view-segment" value="notes">
+          <ion-segment-button id="seg-notes" value="notes">
+            <ion-label>Kõik märkused</ion-label>
+          </ion-segment-button>
 
-<div id="filter-bar" class="ion-hide">
-<ion-chip id="filter-chip">
-<ion-icon name="folder-outline"></ion-icon>
-<ion-label id="filter-label"></ion-label>
-<ion-icon name="close-circle"></ion-icon>
-</ion-chip>
-</div>
+          <ion-segment-button value="folders">
+            <ion-label>Kaustad</ion-label>
+          </ion-segment-button>
 
-<div id="notes-list"></div>
-</div>
+          <ion-segment-button value="devices">
+            <ion-label>Seadmed</ion-label>
+          </ion-segment-button>
+        </ion-segment>
+      </ion-toolbar>
+    </ion-header>
 
-<div id="folders-view" class="ion-hide">
-<div id="folders-empty" class="empty-state ion-hide">
-<ion-icon name="folder-open-outline"></ion-icon>
-<p>Kaustu pole veel. Lisa esimene!</p>
-</div>
-<div id="folders-grid"></div>
-</div>
+    <ion-content id="main-content">
 
-<div id="detail-view" class="ion-hide">
-<ion-toolbar class="detail-toolbar">
-<ion-buttons slot="start">
-<ion-button id="modal-back">
-<ion-icon slot="start" name="chevron-back"></ion-icon>
-                Kõik märkused
-</ion-button>
-</ion-buttons>
-</ion-toolbar>
-<div class="detail">
-<h1 id="detail-title"></h1>
-<dl class="detail-meta">
-<dt>Loodud</dt>
-<dd id="detail-created"></dd>
-<dt>Kaust</dt>
-<dd id="detail-folder"></dd>
-<dt>Pikkus</dt>
-<dd id="detail-length"></dd>
-</dl>
-<hr />
-<p id="detail-text"></p>
-<div class="detail-actions">
-<ion-button id="detail-edit">Muuda</ion-button>
-<ion-button id="detail-delete" fill="outline">Kustuta</ion-button>
-</div>
-</div>
-</div>
+      <!-- MÄRKUSTE VAADE -->
+      <div id="notes-view">
+        <div class="editor">
+          <p id="live-text"></p>
 
-<ion-fab id="record-fab" slot="fixed" vertical="bottom" horizontal="center">
-<ion-button id="record-btn" shape="round">
-<ion-icon slot="start" name="mic"></ion-icon>
-<span id="record-label">Räägi märkus</span>
-</ion-button>
-</ion-fab>
+          <ion-textarea
+            id="draft"
+            label="Märkus"
+            label-placement="stacked"
+            fill="outline"
+            auto-grow="true"
+            rows="2"
+          ></ion-textarea>
 
-<ion-fab id="folder-fab" class="ion-hide" slot="fixed" vertical="bottom" horizontal="center">
-<ion-button id="add-folder-btn" shape="round">
-<ion-icon slot="start" name="add"></ion-icon>
-Lisa kaust
-</ion-button>
-</ion-fab>
-</ion-content>
+          <div class="folder-picker-wrap">
+            <span class="folder-picker-label">Kaust</span>
+            <div id="folder-picker" class="folder-picker"></div>
+          </div>
 
-</ion-app>
+          <div class="editor-actions">
+            <ion-button id="save-btn" size="small">
+              Salvesta
+            </ion-button>
 
-<script type="module" src="/src/main.ts"></script>
+            <ion-button id="cancel-btn" size="small" fill="outline">
+              Tühista
+            </ion-button>
+          </div>
+        </div>
+
+        <div id="filter-bar" class="ion-hide">
+          <ion-chip id="filter-chip">
+            <ion-icon name="folder-outline"></ion-icon>
+            <ion-label id="filter-label"></ion-label>
+            <ion-icon name="close-circle"></ion-icon>
+          </ion-chip>
+        </div>
+
+        <div id="notes-list"></div>
+      </div>
+
+      <!-- KAUSTADE VAADE -->
+      <div id="folders-view" class="ion-hide">
+        <div id="folders-empty" class="empty-state ion-hide">
+          <ion-icon name="folder-open-outline"></ion-icon>
+          <p>Kaustu pole veel. Lisa esimene!</p>
+        </div>
+
+        <div id="folders-grid"></div>
+      </div>
+
+      <!-- SEADMETE VAADE -->
+      <div id="devices-view" class="ion-hide">
+        <div class="device-panel">
+          <h2>
+            <ion-icon name="mic"></ion-icon>
+            Mikrofon
+          </h2>
+
+          <p>
+            Mõõda mikrofoni siseneva heli tugevust reaalajas.
+          </p>
+
+          <ion-button id="mic-test-btn" expand="block">
+            <ion-icon slot="start" name="mic"></ion-icon>
+            Alusta mõõtmist
+          </ion-button>
+
+          <ion-progress-bar
+            id="mic-level"
+            value="0"
+          ></ion-progress-bar>
+
+          <p id="mic-status" role="status">
+            Mikrofon pole aktiivne
+          </p>
+        </div>
+
+        <div class="device-panel">
+          <h2>
+            <ion-icon name="camera"></ion-icon>
+            Kaamera
+          </h2>
+
+          <p>
+            Käivita kaamera ja vaata reaalajas videopilti.
+          </p>
+
+          <video
+            id="camera-preview"
+            autoplay
+            muted
+            playsinline
+            aria-label="Kaamera eelvaade"
+          ></video>
+
+          <ion-button id="camera-start-btn" expand="block">
+            <ion-icon slot="start" name="camera"></ion-icon>
+            Käivita kaamera
+          </ion-button>
+
+          <ion-button
+            id="camera-stop-btn"
+            expand="block"
+            fill="outline"
+          >
+            Peata kaamera
+          </ion-button>
+
+          <p id="camera-status" role="status">
+            Kaamera pole aktiivne
+          </p>
+        </div>
+      </div>
+
+      <!-- MÄRKUSE DETAILVAADE -->
+      <div id="detail-view" class="ion-hide">
+        <ion-toolbar class="detail-toolbar">
+          <ion-buttons slot="start">
+            <ion-button id="modal-back">
+              <ion-icon slot="start" name="chevron-back"></ion-icon>
+              Kõik märkused
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+
+        <div class="detail">
+          <h1 id="detail-title"></h1>
+
+          <dl class="detail-meta">
+            <dt>Loodud</dt>
+            <dd id="detail-created"></dd>
+
+            <dt>Kaust</dt>
+            <dd id="detail-folder"></dd>
+
+            <dt>Pikkus</dt>
+            <dd id="detail-length"></dd>
+          </dl>
+
+          <hr />
+
+          <p id="detail-text"></p>
+
+          <div class="detail-actions">
+            <ion-button id="detail-edit">
+              Muuda
+            </ion-button>
+
+            <ion-button id="detail-delete" fill="outline">
+              Kustuta
+            </ion-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÄRKUSE SALVESTAMISE NUPP -->
+      <ion-fab
+        id="record-fab"
+        slot="fixed"
+        vertical="bottom"
+        horizontal="center"
+      >
+        <ion-button id="record-btn" shape="round">
+          <ion-icon slot="start" name="mic"></ion-icon>
+          <span id="record-label">Räägi märkus</span>
+        </ion-button>
+      </ion-fab>
+
+      <!-- KAUSTA LISAMISE NUPP -->
+      <ion-fab
+        id="folder-fab"
+        class="ion-hide"
+        slot="fixed"
+        vertical="bottom"
+        horizontal="center"
+      >
+        <ion-button id="add-folder-btn" shape="round">
+          <ion-icon slot="start" name="add"></ion-icon>
+          Lisa kaust
+        </ion-button>
+      </ion-fab>
+
+    </ion-content>
+  </ion-app>
+
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
