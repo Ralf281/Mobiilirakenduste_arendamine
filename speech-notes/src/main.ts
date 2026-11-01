@@ -1,4 +1,4 @@
-﻿import { defineCustomElements } from '@ionic/core/loader';
+import { defineCustomElements } from '@ionic/core/loader';
 defineCustomElements(window);
 
 import '@ionic/core/css/core.css';
@@ -65,21 +65,42 @@ const segment = document.getElementById('view-segment') as HTMLIonSegmentElement
 const notesView = document.getElementById('notes-view')!;
 const foldersView = document.getElementById('folders-view')!;
 const detailView = document.getElementById('detail-view')!;
+const arView = document.getElementById("ar-view")!;
+const arModeSegment = document.getElementById('ar-mode-segment') as HTMLIonSegmentElement;
+const arFrame = document.getElementById('ar-frame') as HTMLIFrameElement;
 const segmentToolbar = document.querySelector('.segment-toolbar')!;
 
-function showView(view: 'notes' | 'folders' | 'detail') {
+let searchQuery = '';
+const searchbar = document.getElementById("search-bar") as HTMLIonSearchbarElement
+
+function showView(view: 'notes' | 'folders' | 'detail' | 'augmentedReality') {
   notesView.classList.toggle('ion-hide', view !== 'notes');
   foldersView.classList.toggle('ion-hide', view !== 'folders');
   detailView.classList.toggle('ion-hide', view !== 'detail');
+  arView.classList.toggle('ion-hide', view !== 'augmentedReality');
   segmentToolbar.classList.toggle('ion-hide', view === 'detail');
   // folders tab: "Lisa kaust" button instead of the record button
   recordFab.classList.toggle('ion-hide', view === 'folders');
   folderFab.classList.toggle('ion-hide', view !== 'folders');
+  searchbar.value = ""
 }
 
 segment.addEventListener('ionChange', (ev: any) => {
-  showView(ev.detail.value === 'folders' ? 'folders' : 'notes');
+  showView(ev.detail.value === 'folders' ? 'folders'
+    : ev.detail.value === 'augmented-reality' ? 'augmentedReality' 
+    : 'notes'
+  );
 });
+
+const arPageRoot = `${import.meta.env.BASE_URL}${import.meta.env.DEV ? 'src/ar/' : 'ar/'}`;
+function setArMode(mode: string) {
+  const page = mode === 'markerless' ? 'webxr-ar.html' : 'aframe-ar.html';
+  const src = `${arPageRoot}${page}`;
+  if (arFrame.getAttribute('src') !== src) arFrame.src = src;
+}
+
+setArMode(String(arModeSegment.value || 'marker'));
+arModeSegment.addEventListener('ionChange', (ev: any) => setArMode(String(ev.detail.value ?? 'marker')));
 
 // Tapping "Kõik märkused" always clears the folder filter
 document.getElementById('seg-notes')!.addEventListener('click', () => {
@@ -236,8 +257,9 @@ async function deleteFolder(f: Folder) {
 
 function renderFolders() {
   foldersGrid.innerHTML = '';
-  foldersEmpty.classList.toggle('ion-hide', folders.length > 0);
-  for (const f of folders) {
+  const visibleFolders = folders.filter(folder => folder.name.toLocaleLowerCase().includes(searchQuery));
+  foldersEmpty.classList.toggle('ion-hide', visibleFolders.length > 0);
+  for (const f of visibleFolders) {
     const count = notes.filter((n) => n.folderId === f.id).length;
 
     const card = document.createElement('ion-card');
@@ -321,8 +343,11 @@ document.getElementById('detail-delete')!.addEventListener('click', () => {
 
 function render() {
   list.innerHTML = '';
-  const visible =
-    activeFolderId === null ? notes : notes.filter((n) => n.folderId === activeFolderId);
+  const visible = notes.filter(note => {
+    const matchesFolder = activeFolderId === null || note.folderId === activeFolderId;
+    const matchesSearch = note.text.toLocaleLowerCase().includes(searchQuery);
+    return matchesFolder && matchesSearch
+  });
 
   if (visible.length === 0 && activeFolderId !== null) {
     const empty = document.createElement('p');
@@ -515,6 +540,23 @@ async function saveDraft() {
   renderFolders();
 }
 
+async function showSearchbar() {
+  const searchbar = document.getElementById("search-bar")! as HTMLIonSearchbarElement;
+  if (!searchbar.classList.contains("ion-hide")) {
+    searchbar.classList.add("ion-hide");
+  }
+  else {
+    searchbar.classList.remove("ion-hide");
+  }
+}
+
+function searchTerm(term: string | null | undefined) {
+  searchQuery = (term ?? '').trim().toLocaleLowerCase();
+
+  render();
+  renderFolders();
+}
+
 btn.addEventListener('click', () => (recording ? stopRecording() : start()));
 document.getElementById('save-btn')!.addEventListener('click', saveDraft);
 document.getElementById('cancel-btn')!.addEventListener('click', () => {
@@ -528,6 +570,13 @@ document.getElementById('clear-btn')!.addEventListener('click', async () => {
   await save();
   render();
   renderFolders();
+});
+
+document.getElementById("search-btn")!.addEventListener('click', showSearchbar);
+
+searchbar.addEventListener('ionInput', (event) => {
+  const element = event.currentTarget as HTMLIonSearchbarElement
+  searchTerm(element.value)
 });
 
 load();

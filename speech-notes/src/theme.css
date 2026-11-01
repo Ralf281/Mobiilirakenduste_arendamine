@@ -453,6 +453,23 @@ ion-modal#note-modal {
   margin-top: 24px;
 }
 
+.toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#search-bar {
+  width: 300px;
+  text-align: left;
+
+  --background: #ffffff;
+  --color: #000000;
+  --placeholder-color: #b5b5b5;
+  --icon-color: #000000;
+  --border-radius: 10px;
+}
+
 /* Ionic sets radius/shadow on :host(.button-solid/.button-small); raise specificity to win */
 ion-button.button-solid,
 ion-button.button-small,
