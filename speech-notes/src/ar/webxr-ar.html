@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Markerless WebXR demo</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #111; color: #fff; font: 16px system-ui, sans-serif; }
+    canvas { display: block; }
+    #panel { position: fixed; z-index: 2; inset: 12px 12px auto; padding: 12px; border-radius: 12px; background: #111d; }
+    #start { padding: 10px 14px; border: 0; border-radius: 8px; background: #fff; color: #111; font-weight: 700; }
+    #status { margin: 8px 0 0; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <button id="start" type="button">Start markerless AR</button>
+    <p id="status">Point at a flat surface, then tap to place a cube. WebXR requires a compatible browser/device and a secure context.</p>
+  </div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+    const status = document.querySelector('#status');
+    const button = document.querySelector('#start');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    renderer.xr.setReferenceSpaceType('local');
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const reticle = new THREE.Mesh(
+      new THREE.RingGeometry(0.08, 0.11, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0x42ff9e })
+    );
+    reticle.matrixAutoUpdate = false;
+    reticle.visible = false;
+    scene.add(reticle);
+
+    let session = null;
+    let hitTestSource = null;
+    let localSpace = null;
+
+    function placeCube() {
+      if (!reticle.visible) {
+        status.textContent = 'No surface detected yet. Slowly move the camera over a textured, well-lit surface.';
+        return;
+      }
+      const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.12, 0.12),
+        new THREE.MeshNormalMaterial()
+      );
+      cube.position.setFromMatrixPosition(reticle.matrix);
+      cube.position.y += 0.06;
+      scene.add(cube);
+      status.textContent = 'Cube placed. Tap again to place another.';
+    }
+
+    button.addEventListener('click', async () => {
+      if (session) {
+        await session.end();
+        return;
+      }
+      if (!navigator.xr) {
+        status.textContent = 'WebXR is unavailable here. Try a compatible Android browser over HTTPS, or use the marker example.';
+        return;
+      }
+      try {
+        const supported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!supported) {
+          status.textContent = 'This browser/device does not support immersive AR. Use the marker example or try a compatible Android browser over HTTPS.';
+          return;
+        }
+        session = await navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['hit-test'],
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: document.querySelector('#panel') }
+        });
+        session.addEventListener('end', () => {
+          session = null;
+          hitTestSource?.cancel();
+          hitTestSource = null;
+          reticle.visible = false;
+          button.textContent = 'Start markerless AR';
+          status.textContent = 'AR session ended.';
+          renderer.setAnimationLoop(null);
+        });
+        await renderer.xr.setSession(session);
+        const viewerSpace = await session.requestReferenceSpace('viewer');
+        localSpace = await session.requestReferenceSpace('local');
+        hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+        session.addEventListener('select', placeCube);
+        button.textContent = 'End AR';
+        status.textContent = 'Move the camera until the green ring appears, then tap to place a cube.';
+        renderer.setAnimationLoop((_time, frame) => {
+          if (frame && hitTestSource && localSpace) {
+            const hits = frame.getHitTestResults(hitTestSource);
+            if (hits.length) {
+              const pose = hits[0].getPose(localSpace);
+              reticle.visible = !!pose;
+              if (pose) reticle.matrix.fromArray(pose.transform.matrix);
+            } else {
+              reticle.visible = false;
+            }
+          }
+          renderer.render(scene, camera);
+        });
+      } catch (error) {
+        session = null;
+        status.textContent = `Could not start WebXR AR: ${error?.message ?? error}`;
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

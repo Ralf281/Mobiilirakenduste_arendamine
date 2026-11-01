@@ -20,6 +20,10 @@ export default defineConfig({
           src: 'node_modules/@ionic/core/dist/ionic/*',
           dest: '',
         },
+        {
+          src: 'src/ar/*.html',
+          dest: 'ar',
+        },
       ],
     }),
   ],

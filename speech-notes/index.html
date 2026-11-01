@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="et" dir="ltr">
 
 <head>
@@ -35,6 +35,9 @@
                     </ion-segment-button>
                     <ion-segment-button value="folders">
                         <ion-label>Kaustad</ion-label>
+                    </ion-segment-button>
+                    <ion-segment-button value="augmented-reality">
+                        <ion-label>Augmenteeritud reaalsus</ion-label>
                     </ion-segment-button>
                 </ion-segment>
             </ion-toolbar>
@@ -103,6 +106,18 @@
                         <ion-button id="detail-delete" fill="outline">Kustuta</ion-button>
                     </div>
                 </div>
+            </div>
+
+            <div id="ar-view" class="ion-hide" style="position:absolute; inset:0; z-index:5;">
+                <ion-segment id="ar-mode-segment" value="marker" style="position:absolute; top:8px; left:0; z-index:1; background:#fff;">
+                    <ion-segment-button value="marker">
+                        <ion-label>Marker</ion-label>
+                    </ion-segment-button>
+                    <ion-segment-button value="markerless">
+                        <ion-label>Markerless (WebXR)</ion-label>
+                    </ion-segment-button>
+                </ion-segment>
+                <iframe id="ar-frame" src="about:blank" allow="camera; xr-spatial-tracking" allowfullscreen style="position:absolute; top:52px; left:0; width:100%; height:calc(100% - 52px); border:0;"></iframe>
             </div>
 
             <ion-fab id="record-fab" slot="fixed" vertical="bottom" horizontal="center">

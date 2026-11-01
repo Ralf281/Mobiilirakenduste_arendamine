@@ -1,4 +1,4 @@
-﻿import { defineCustomElements } from '@ionic/core/loader';
+import { defineCustomElements } from '@ionic/core/loader';
 defineCustomElements(window);
 
 import '@ionic/core/css/core.css';
@@ -65,15 +65,19 @@ const segment = document.getElementById('view-segment') as HTMLIonSegmentElement
 const notesView = document.getElementById('notes-view')!;
 const foldersView = document.getElementById('folders-view')!;
 const detailView = document.getElementById('detail-view')!;
+const arView = document.getElementById("ar-view")!;
+const arModeSegment = document.getElementById('ar-mode-segment') as HTMLIonSegmentElement;
+const arFrame = document.getElementById('ar-frame') as HTMLIFrameElement;
 const segmentToolbar = document.querySelector('.segment-toolbar')!;
 
 let searchQuery = '';
 const searchbar = document.getElementById("search-bar") as HTMLIonSearchbarElement
 
-function showView(view: 'notes' | 'folders' | 'detail') {
+function showView(view: 'notes' | 'folders' | 'detail' | 'augmentedReality') {
   notesView.classList.toggle('ion-hide', view !== 'notes');
   foldersView.classList.toggle('ion-hide', view !== 'folders');
   detailView.classList.toggle('ion-hide', view !== 'detail');
+  arView.classList.toggle('ion-hide', view !== 'augmentedReality');
   segmentToolbar.classList.toggle('ion-hide', view === 'detail');
   // folders tab: "Lisa kaust" button instead of the record button
   recordFab.classList.toggle('ion-hide', view === 'folders');
@@ -82,8 +86,21 @@ function showView(view: 'notes' | 'folders' | 'detail') {
 }
 
 segment.addEventListener('ionChange', (ev: any) => {
-  showView(ev.detail.value === 'folders' ? 'folders' : 'notes');
+  showView(ev.detail.value === 'folders' ? 'folders'
+    : ev.detail.value === 'augmented-reality' ? 'augmentedReality' 
+    : 'notes'
+  );
 });
+
+const arPageRoot = `${import.meta.env.BASE_URL}${import.meta.env.DEV ? 'src/ar/' : 'ar/'}`;
+function setArMode(mode: string) {
+  const page = mode === 'markerless' ? 'webxr-ar.html' : 'aframe-ar.html';
+  const src = `${arPageRoot}${page}`;
+  if (arFrame.getAttribute('src') !== src) arFrame.src = src;
+}
+
+setArMode(String(arModeSegment.value || 'marker'));
+arModeSegment.addEventListener('ionChange', (ev: any) => setArMode(String(ev.detail.value ?? 'marker')));
 
 // Tapping "Kõik märkused" always clears the folder filter
 document.getElementById('seg-notes')!.addEventListener('click', () => {
