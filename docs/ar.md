@@ -200,15 +200,6 @@ Ava `http://localhost:5173`. WebXR leht näitab eelvaadet. Markeri režiim töö
 | 8 | Nupud AR-is (värv, "Võta tagasi") | Nupud töötavad ega paiguta kogemata märget | ☐ |
 | 9 | Liikumine ruumis | Märkmed püsivad oma kohal, ei "uju" | ☐ |
 
-### Silumine ja profiilimine
-- **Chrome remote debugging:** ühenda telefon USB-ga ja ava arvutis `chrome://inspect`. Sealt näeb telefoni Chrome'i konsooli (veateated, `navigator.xr` olemasolu) ja saab salvestada **Performance** profiili FPS-i jälgimiseks.
-- **WebView silumine:** samast `chrome://inspect` vaatest leiab ka äpi WebView. Seal saab kontrollida, et `navigator.xr` on `undefined`, mis kinnitab, miks AR äpi sees ei tööta.
-- **Android Studio Profiler:** CPU ja mälu kasutus AR-vaates.
-- AR-leht kirjutab oleku ekraanile (`#status`), näiteks "Pinda pole veel leitud" või "See seade ei toeta immersive-ar režiimi", mis aitab testimisel aru saada, mis seisus sessioon on.
-
-### Tähelepanekud testimisest
-_Täita pärast testimist: seade, Androidi versioon, mis töötas, mis mitte, FPS._
-
 ---
 
 ## Allikad
