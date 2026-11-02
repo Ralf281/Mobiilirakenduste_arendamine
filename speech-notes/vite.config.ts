@@ -19,10 +19,13 @@ export default defineConfig({
         {
           src: 'node_modules/@ionic/core/dist/ionic/*',
           dest: '',
+          // v3+ jätab kaustastruktuuri alles; stripBase kopeerib failid otse sihtkausta
+          rename: { stripBase: true },
         },
         {
           src: 'src/ar/*.html',
           dest: 'ar',
+          rename: { stripBase: true },
         },
       ],
     }),

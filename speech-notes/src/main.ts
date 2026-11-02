@@ -80,7 +80,7 @@ function showView(view: 'notes' | 'folders' | 'detail' | 'augmentedReality') {
   arView.classList.toggle('ion-hide', view !== 'augmentedReality');
   segmentToolbar.classList.toggle('ion-hide', view === 'detail');
   // folders tab: "Lisa kaust" button instead of the record button
-  recordFab.classList.toggle('ion-hide', view === 'folders');
+  recordFab.classList.toggle('ion-hide', view === 'folders' || view === 'augmentedReality');
   folderFab.classList.toggle('ion-hide', view !== 'folders');
   searchbar.value = ""
 }
@@ -90,17 +90,51 @@ segment.addEventListener('ionChange', (ev: any) => {
     : ev.detail.value === 'augmented-reality' ? 'augmentedReality' 
     : 'notes'
   );
+  // AR-vaatesse minnes värskenda märkmed, mis AR-lehele kaasa antakse
+  if (ev.detail.value === 'augmented-reality') setArMode(arMode);
 });
 
 const arPageRoot = `${import.meta.env.BASE_URL}${import.meta.env.DEV ? 'src/ar/' : 'ar/'}`;
-function setArMode(mode: string) {
-  const page = mode === 'markerless' ? 'webxr-ar.html' : 'aframe-ar.html';
-  const src = `${arPageRoot}${page}`;
-  if (arFrame.getAttribute('src') !== src) arFrame.src = src;
+// Sama WebXR leht GitHub Pages'is (HTTPS). Capacitori WebView ei toeta WebXR-i,
+// seega päris AR avatakse telefoni Chrome'is.
+const AR_PAGES_URL = 'https://coolysn.github.io/Mobiilirakenduste_arendamine/';
+const arOpenChrome = document.getElementById('ar-open-chrome') as HTMLIonButtonElement;
+let arMode = String(arModeSegment.value || 'marker');
+
+// Viimased märkmed antakse AR-lehele URL-i parameetrina: ?notes=["...","..."]
+function arNotesQuery(): string {
+  const texts = notes
+    .map((n) => n.text.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((t) => t.slice(0, 160));
+  return texts.length ? `?notes=${encodeURIComponent(JSON.stringify(texts))}` : '';
 }
 
-setArMode(String(arModeSegment.value || 'marker'));
+function setArMode(mode: string) {
+  arMode = mode;
+  const page = mode === 'markerless' ? 'webxr-ar.html' : 'aframe-ar.html';
+  const src = `${arPageRoot}${page}${arNotesQuery()}`;
+  if (arFrame.getAttribute('src') !== src) arFrame.src = src;
+  arOpenChrome.classList.toggle('ion-hide', mode !== 'markerless');
+  // markerless režiimis on nupp segmendi all, iframe algab selle alt
+  const top = mode === 'markerless' ? 100 : 52;
+  arFrame.style.top = `${top}px`;
+  arFrame.style.height = `calc(100% - ${top}px)`;
+}
+
+setArMode(arMode);
 arModeSegment.addEventListener('ionChange', (ev: any) => setArMode(String(ev.detail.value ?? 'marker')));
+
+arOpenChrome.addEventListener('click', () => {
+  const url = `${AR_PAGES_URL}webxr-ar.html${arNotesQuery()}`;
+  if (Capacitor.isNativePlatform()) {
+    // Capacitor avab välise aadressi süsteemi vaikebrauseris (Chrome)
+    window.location.href = url;
+  } else {
+    window.open(url, '_blank');
+  }
+});
 
 // Tapping "Kõik märkused" always clears the folder filter
 document.getElementById('seg-notes')!.addEventListener('click', () => {

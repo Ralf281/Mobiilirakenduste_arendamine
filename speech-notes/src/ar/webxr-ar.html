@@ -1,27 +1,242 @@
 <!doctype html>
-<html lang="en">
+<html lang="et">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Markerless WebXR demo</title>
+  <title>AR sticky notes</title>
   <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #111; color: #fff; font: 16px system-ui, sans-serif; }
-    canvas { display: block; }
-    #panel { position: fixed; z-index: 2; inset: 12px 12px auto; padding: 12px; border-radius: 12px; background: #111d; }
-    #start { padding: 10px 14px; border: 0; border-radius: 8px; background: #fff; color: #111; font-weight: 700; }
-    #status { margin: 8px 0 0; font-size: 14px; }
+    :root {
+      --ink: #1b1b1b;
+      --card: #ffffffee;
+      --muted: #5c5c5c;
+      --accent: #1b1b1b;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ece9e2; color: var(--ink); font: 15px/1.35 system-ui, sans-serif; }
+    canvas { display: block; touch-action: none; }
+
+    /* #ui on ka WebXR dom-overlay juur: täidab ekraani, aga laseb puuted läbi kaartide vahelt */
+    #ui { position: fixed; inset: 0; z-index: 2; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+    .card { pointer-events: auto; background: var(--card); border-radius: 14px; padding: 12px; box-shadow: 0 4px 18px #0002; backdrop-filter: blur(6px); }
+    h1 { margin: 0 0 4px; font-size: 17px; }
+    #status { margin: 0; color: var(--muted); font-size: 13.5px; }
+
+    .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 10px 0 6px; }
+    #chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+    .chip { flex: 0 0 auto; max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1.5px solid #0002; border-radius: 999px; padding: 6px 12px; background: #fff; font: inherit; font-size: 14px; color: var(--ink); }
+    .chip[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #custom { width: 100%; margin-top: 8px; border: 1.5px solid #0002; border-radius: 10px; padding: 8px 10px; font: inherit; resize: none; }
+
+    .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .swatch { width: 30px; height: 30px; border-radius: 6px; border: 2px solid transparent; box-shadow: inset 0 0 0 1px #0002; padding: 0; }
+    .swatch[aria-pressed="true"] { border-color: var(--ink); }
+    .spacer { flex: 1; }
+    button.action { border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; font-weight: 650; background: var(--accent); color: #fff; }
+    button.ghost { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 1.5px #0003; }
+    button:disabled { opacity: .4; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <div id="panel">
-    <button id="start" type="button">Start markerless AR</button>
-    <p id="status">Point at a flat surface, then tap to place a cube. WebXR requires a compatible browser/device and a secure context.</p>
+  <div id="ui">
+    <div class="card" id="top">
+      <h1>Kleebi märkmed ruumi</h1>
+      <p id="status">Vali märge, siis alusta AR-i ja suuna kaamera lauale või seinale.</p>
+    </div>
+
+    <div class="card" id="bottom">
+      <div class="label">Märge</div>
+      <div id="chips"></div>
+      <textarea id="custom" rows="2" maxlength="160" placeholder="…või kirjuta uus märge"></textarea>
+      <div class="row">
+        <div id="swatches" class="row" style="margin:0"></div>
+        <span class="spacer"></span>
+        <button id="undo" class="action ghost" type="button" disabled>Võta tagasi</button>
+        <button id="start" class="action" type="button">Alusta AR-i</button>
+      </div>
+    </div>
   </div>
+
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 
+    /* ---------- Andmed: märkmed tulevad äpist URL-i kaudu (?notes=["...","..."]) ---------- */
+
+    function notesFromUrl() {
+      const params = new URLSearchParams(location.search);
+      try {
+        const list = JSON.parse(params.get('notes') ?? '[]');
+        if (Array.isArray(list)) {
+          const clean = list.map((t) => String(t).trim()).filter(Boolean).slice(0, 8);
+          if (clean.length) return clean;
+        }
+      } catch { /* vigane parameeter – kasutame näidiseid */ }
+      return ['Osta piima', 'Esitlus järgmisel nädalal', 'Kasta lilli'];
+    }
+
+    const COLORS = ['#ffe873', '#ffb3c7', '#9fdcff', '#b6f0a0'];
+    const presetNotes = notesFromUrl();
+    let selectedText = presetNotes[0];
+    let selectedColor = COLORS[0];
+
+    const ui = document.querySelector('#ui');
     const status = document.querySelector('#status');
-    const button = document.querySelector('#start');
+    const chipsEl = document.querySelector('#chips');
+    const custom = document.querySelector('#custom');
+    const swatchesEl = document.querySelector('#swatches');
+    const startBtn = document.querySelector('#start');
+    const undoBtn = document.querySelector('#undo');
+
+    function renderChips() {
+      chipsEl.innerHTML = '';
+      for (const text of presetNotes) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.textContent = text;
+        b.setAttribute('aria-pressed', String(!custom.value.trim() && text === selectedText));
+        b.addEventListener('click', () => {
+          custom.value = '';
+          selectedText = text;
+          renderChips();
+          refreshGhost();
+        });
+        chipsEl.appendChild(b);
+      }
+    }
+
+    function renderSwatches() {
+      swatchesEl.innerHTML = '';
+      for (const color of COLORS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'swatch';
+        b.style.background = color;
+        b.title = 'Märkme värv';
+        b.setAttribute('aria-pressed', String(color === selectedColor));
+        b.addEventListener('click', () => {
+          selectedColor = color;
+          renderSwatches();
+          refreshGhost();
+        });
+        swatchesEl.appendChild(b);
+      }
+    }
+
+    custom.addEventListener('input', () => {
+      const t = custom.value.trim();
+      if (t) selectedText = t;
+      else selectedText = presetNotes[0];
+      renderChips();
+      refreshGhost();
+    });
+
+    renderChips();
+    renderSwatches();
+
+    /* ---------- Märkme tekstuur: kirjutame teksti canvasele ---------- */
+
+    function wrapLines(ctx, text, maxWidth) {
+      const words = text.split(/\s+/);
+      const lines = [];
+      let line = '';
+      for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    function makeNoteTexture(text, color) {
+      const size = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // paber + kergelt tumedam liimiriba ülaservas
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      ctx.fillRect(0, 0, size, 70);
+      // kerge varjund alumises nurgas, nagu paber kooluks
+      const g = ctx.createLinearGradient(size * 0.6, size * 0.6, size, size);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, 'rgba(0,0,0,0.10)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, size, size);
+
+      // tekst: vähendame fonti, kuni mahub ära
+      const pad = 48;
+      let fontSize = 96;
+      let lines;
+      do {
+        ctx.font = `600 ${fontSize}px "Segoe Print", "Comic Sans MS", "Bradley Hand", system-ui, sans-serif`;
+        lines = wrapLines(ctx, text, size - pad * 2);
+        fontSize -= 4;
+      } while (lines.length * fontSize * 1.25 > size - 70 - pad * 1.5 && fontSize > 28);
+
+      const lineHeight = fontSize * 1.25;
+      ctx.fillStyle = '#2a2a2a';
+      ctx.textBaseline = 'top';
+      let y = 70 + (size - 70 - lines.length * lineHeight) / 2;
+      for (const l of lines) {
+        ctx.fillText(l, pad, y);
+        y += lineHeight;
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    const NOTE_SIZE = 0.15; // 15 cm – päris post-it on 7,6 cm, aga AR-is loetavam suuremana
+    const noteGeometry = new THREE.PlaneGeometry(NOTE_SIZE, NOTE_SIZE);
+
+    function makeNoteMesh(text, color, opacity = 1) {
+      const material = new THREE.MeshBasicMaterial({
+        map: makeNoteTexture(text, color),
+        side: THREE.DoubleSide,
+        transparent: opacity < 1,
+        opacity,
+      });
+      return new THREE.Mesh(noteGeometry, material);
+    }
+
+    /* ---------- Paigutus: kuidas märge pinnale "kleepub" ---------- */
+
+    const UP = new THREE.Vector3(0, 1, 0);
+    const _normal = new THREE.Vector3();
+
+    // position + pinna normaal + kaamera asukoht -> märkme asend ja pööre
+    function placeOnSurface(mesh, position, normal, cameraPos, tilt = 0) {
+      _normal.copy(normal).normalize();
+      mesh.position.copy(position).addScaledVector(_normal, 0.002); // 2 mm pinnast eemal, et ei vilguks
+
+      if (_normal.y > 0.7) {
+        // horisontaalne pind (laud, põrand): märge lamab, teksti ülaserv kaamerast eemale
+        const dx = position.x - cameraPos.x;
+        const dz = position.z - cameraPos.z;
+        const yaw = Math.atan2(-dx, -dz);
+        mesh.rotation.set(-Math.PI / 2, yaw, tilt, 'YXZ');
+      } else if (_normal.y < -0.7) {
+        // lagi
+        mesh.rotation.set(Math.PI / 2, 0, tilt, 'YXZ');
+      } else {
+        // vertikaalne pind (sein, kapp): märge vaatab seinast välja, tekst püsti
+        const yaw = Math.atan2(_normal.x, _normal.z);
+        mesh.rotation.set(0, yaw, tilt, 'YXZ');
+      }
+    }
+
+    /* ---------- Three.js põhi ---------- */
+
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -30,90 +245,245 @@
     document.body.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 30);
+
+    // roheline rõngas näitab leitud pinda
     const reticle = new THREE.Mesh(
-      new THREE.RingGeometry(0.08, 0.11, 32).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: 0x42ff9e })
+      new THREE.RingGeometry(0.035, 0.045, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0x2bd47d })
     );
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
     scene.add(reticle);
 
+    // poolläbipaistev "kummitusmärge" näitab, kuhu märge läheb
+    let ghost = makeNoteMesh(selectedText, selectedColor, 0.55);
+    ghost.visible = false;
+    scene.add(ghost);
+
+    function refreshGhost() {
+      const { position, rotation, visible } = ghost;
+      ghost.material.map.dispose();
+      ghost.material.dispose();
+      scene.remove(ghost);
+      ghost = makeNoteMesh(selectedText, selectedColor, 0.55);
+      ghost.position.copy(position);
+      ghost.rotation.copy(rotation);
+      ghost.visible = visible;
+      scene.add(ghost);
+    }
+
+    const placed = []; // { mesh, born }
+    const target = { valid: false, position: new THREE.Vector3(), normal: new THREE.Vector3(), cameraPos: new THREE.Vector3() };
+
+    function placeNote() {
+      if (!target.valid) {
+        status.textContent = 'Pinda pole veel leitud. Liiguta telefoni aeglaselt hästi valgustatud, mustriga pinna kohal.';
+        return;
+      }
+      const tilt = (Math.random() - 0.5) * 0.18; // kerge viltu, nagu päris kleebis
+      const mesh = makeNoteMesh(selectedText, selectedColor);
+      placeOnSurface(mesh, target.position, target.normal, target.cameraPos, tilt);
+      mesh.scale.setScalar(0.001);
+      scene.add(mesh);
+      placed.push({ mesh, born: performance.now() });
+      undoBtn.disabled = false;
+      status.textContent = `Kleebitud: „${selectedText}“ (${placed.length} märget). Puuduta uuesti, et lisada veel.`;
+      navigator.vibrate?.(20);
+    }
+
+    function undo() {
+      const last = placed.pop();
+      if (!last) return;
+      scene.remove(last.mesh);
+      last.mesh.material.map.dispose();
+      last.mesh.material.dispose();
+      undoBtn.disabled = placed.length === 0;
+      status.textContent = placed.length ? `${placed.length} märget alles.` : 'Kõik märkmed eemaldatud.';
+    }
+    undoBtn.addEventListener('click', undo);
+
+    // "kleepumise" animatsioon: märge hüppab kergelt üle oma suuruse ja vajub paika
+    function easeOutBack(t) {
+      const c1 = 1.70158, c3 = c1 + 1;
+      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+    function animatePlaced(now) {
+      for (const p of placed) {
+        const t = Math.min((now - p.born) / 350, 1);
+        p.mesh.scale.setScalar(Math.max(easeOutBack(t), 0.001));
+      }
+    }
+
+    /* ---------- Päris AR: WebXR immersive-ar + hit-test ---------- */
+
     let session = null;
     let hitTestSource = null;
     let localSpace = null;
+    const _m = new THREE.Matrix4();
+    const _q = new THREE.Quaternion();
+    const _s = new THREE.Vector3();
 
-    function placeCube() {
-      if (!reticle.visible) {
-        status.textContent = 'No surface detected yet. Slowly move the camera over a textured, well-lit surface.';
-        return;
-      }
-      const cube = new THREE.Mesh(
-        new THREE.BoxGeometry(0.12, 0.12, 0.12),
-        new THREE.MeshNormalMaterial()
-      );
-      cube.position.setFromMatrixPosition(reticle.matrix);
-      cube.position.y += 0.06;
-      scene.add(cube);
-      status.textContent = 'Cube placed. Tap again to place another.';
+    // Puuted UI kaartidel ei tohi märget paigutada
+    ui.addEventListener('beforexrselect', (e) => {
+      if (e.target.closest?.('.card')) e.preventDefault();
+    });
+
+    async function startAR() {
+      session = await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test'],
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: ui },
+      });
+      stopPreview();
+      document.body.style.background = 'transparent';
+
+      session.addEventListener('end', () => {
+        session = null;
+        hitTestSource?.cancel();
+        hitTestSource = null;
+        reticle.visible = ghost.visible = false;
+        target.valid = false;
+        startBtn.textContent = 'Alusta AR-i';
+        status.textContent = 'AR-sessioon lõppes.';
+        renderer.setAnimationLoop(null);
+        document.body.style.background = '';
+      });
+
+      await renderer.xr.setSession(session);
+      const viewerSpace = await session.requestReferenceSpace('viewer');
+      localSpace = await session.requestReferenceSpace('local');
+      hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+      session.addEventListener('select', placeNote);
+
+      startBtn.textContent = 'Lõpeta';
+      status.textContent = 'Otsi pinda… kui roheline rõngas ilmub, puuduta ekraani.';
+
+      renderer.setAnimationLoop((now, frame) => {
+        if (frame && hitTestSource && localSpace) {
+          const hits = frame.getHitTestResults(hitTestSource);
+          const pose = hits.length ? hits[0].getPose(localSpace) : null;
+          const viewer = frame.getViewerPose(localSpace);
+          if (pose && viewer) {
+            _m.fromArray(pose.transform.matrix);
+            _m.decompose(target.position, _q, _s);
+            // hit-testi poosi Y-telg on pinna normaal
+            target.normal.copy(UP).applyQuaternion(_q);
+            const v = viewer.transform.position;
+            target.cameraPos.set(v.x, v.y, v.z);
+            target.valid = true;
+
+            reticle.matrix.copy(_m);
+            reticle.visible = true;
+            placeOnSurface(ghost, target.position, target.normal, target.cameraPos);
+            ghost.visible = true;
+          } else {
+            target.valid = false;
+            reticle.visible = ghost.visible = false;
+          }
+        }
+        animatePlaced(now);
+        renderer.render(scene, camera);
+      });
     }
 
-    button.addEventListener('click', async () => {
+    /* ---------- Eelvaade ilma AR-ita (arvuti, emulaator, Capacitori WebView) ---------- */
+
+    let previewActive = false;
+    const previewGroup = new THREE.Group();
+    const surfaces = [];
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    function buildPreviewRoom() {
+      // Ainult üks sein: lihtne pind, millele märkmeid kleepida
+      const wall = new THREE.Mesh(new THREE.PlaneGeometry(4, 3), new THREE.MeshBasicMaterial({ color: 0xf3f0ea }));
+      wall.position.set(0, 1.5, -0.6);
+      previewGroup.add(wall);
+      surfaces.push(wall);
+    }
+
+    function startPreview(reason) {
+      if (!surfaces.length) buildPreviewRoom();
+      scene.add(previewGroup);
+      scene.background = new THREE.Color(0xece9e2);
+      camera.position.set(0, 1.5, 0.4);
+      camera.lookAt(0, 1.5, -0.6);
+      previewActive = true;
+      startBtn.classList.add('hidden');
+      status.textContent = `${reason} Eelvaade: puuduta seina, et märge kleepida.`;
+      renderer.setAnimationLoop((now) => {
+        animatePlaced(now);
+        renderer.render(scene, camera);
+      });
+    }
+
+    function stopPreview() {
+      if (!previewActive) return;
+      previewActive = false;
+      scene.remove(previewGroup);
+      scene.background = null;
+      for (const p of placed.splice(0)) scene.remove(p.mesh);
+      undoBtn.disabled = true;
+      ghost.visible = false;
+    }
+
+    function aimFromPointer(ev) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.set(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(surfaces, false)[0];
+      if (!hit) {
+        target.valid = false;
+        ghost.visible = false;
+        return;
+      }
+      target.position.copy(hit.point);
+      target.normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+      target.cameraPos.copy(camera.position);
+      target.valid = true;
+      placeOnSurface(ghost, target.position, target.normal, target.cameraPos);
+      ghost.visible = true;
+    }
+
+    renderer.domElement.addEventListener('pointermove', (ev) => { if (previewActive) aimFromPointer(ev); });
+    renderer.domElement.addEventListener('pointerup', (ev) => {
+      if (!previewActive) return;
+      aimFromPointer(ev);
+      placeNote();
+    });
+
+    /* ---------- Käivitus ---------- */
+
+    startBtn.addEventListener('click', async () => {
       if (session) {
         await session.end();
         return;
       }
-      if (!navigator.xr) {
-        status.textContent = 'WebXR is unavailable here. Try a compatible Android browser over HTTPS, or use the marker example.';
-        return;
-      }
       try {
-        const supported = await navigator.xr.isSessionSupported('immersive-ar');
-        if (!supported) {
-          status.textContent = 'This browser/device does not support immersive AR. Use the marker example or try a compatible Android browser over HTTPS.';
-          return;
-        }
-        session = await navigator.xr.requestSession('immersive-ar', {
-          requiredFeatures: ['hit-test'],
-          optionalFeatures: ['dom-overlay'],
-          domOverlay: { root: document.querySelector('#panel') }
-        });
-        session.addEventListener('end', () => {
-          session = null;
-          hitTestSource?.cancel();
-          hitTestSource = null;
-          reticle.visible = false;
-          button.textContent = 'Start markerless AR';
-          status.textContent = 'AR session ended.';
-          renderer.setAnimationLoop(null);
-        });
-        await renderer.xr.setSession(session);
-        const viewerSpace = await session.requestReferenceSpace('viewer');
-        localSpace = await session.requestReferenceSpace('local');
-        hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-        session.addEventListener('select', placeCube);
-        button.textContent = 'End AR';
-        status.textContent = 'Move the camera until the green ring appears, then tap to place a cube.';
-        renderer.setAnimationLoop((_time, frame) => {
-          if (frame && hitTestSource && localSpace) {
-            const hits = frame.getHitTestResults(hitTestSource);
-            if (hits.length) {
-              const pose = hits[0].getPose(localSpace);
-              reticle.visible = !!pose;
-              if (pose) reticle.matrix.fromArray(pose.transform.matrix);
-            } else {
-              reticle.visible = false;
-            }
-          }
-          renderer.render(scene, camera);
-        });
+        await startAR();
       } catch (error) {
         session = null;
-        status.textContent = `Could not start WebXR AR: ${error?.message ?? error}`;
+        status.textContent = `AR-i ei õnnestunud käivitada: ${error?.message ?? error}`;
       }
     });
 
+    async function init() {
+      let reason = '';
+      if (!window.isSecureContext) {
+        reason = 'WebXR vajab HTTPS-i (või localhost-i).';
+      } else if (!navigator.xr) {
+        reason = 'See brauser/WebView ei toeta WebXR-i. Päris AR-i jaoks ava leht ARCore-toega telefoni Chrome\'is.';
+      } else if (!(await navigator.xr.isSessionSupported('immersive-ar').catch(() => false))) {
+        reason = 'See seade ei toeta immersive-ar režiimi (vaja ARCore-toega Androidi + Chrome\'i).';
+      }
+      if (reason) startPreview(reason);
+    }
+    init();
+
     window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
   </script>
