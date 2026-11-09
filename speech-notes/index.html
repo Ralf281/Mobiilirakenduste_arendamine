@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="et" dir="ltr">
 
 <head>
@@ -15,7 +15,7 @@
                 <ion-avatar slot="start" class="header-avatar">
                     <ion-icon name="person-circle"></ion-icon>
                 </ion-avatar>
-                <ion-title>Speech Notes</ion-title>
+                <ion-title id="app-title">Speech Notes</ion-title>
                 <div slot="end" class="toolbar-end">
                     <ion-searchbar debounce="250" id="search-bar" class="note-search ion-hide"></ion-searchbar>
                     <ion-buttons>
@@ -29,7 +29,7 @@
                 </div>
             </ion-toolbar>
             <ion-toolbar class="segment-toolbar">
-                <ion-segment id="view-segment" value="notes">
+                <ion-segment id="view-segment" value="notes" scrollable="true">
                     <ion-segment-button id="seg-notes" value="notes">
                         <ion-label>Kõik märkused</ion-label>
                     </ion-segment-button>
@@ -38,6 +38,9 @@
                     </ion-segment-button>
                     <ion-segment-button value="augmented-reality">
                         <ion-label>Augmenteeritud reaalsus</ion-label>
+                    </ion-segment-button>
+                    <ion-segment-button value="settings">
+                        <ion-label>Seaded</ion-label>
                     </ion-segment-button>
                 </ion-segment>
             </ion-toolbar>
@@ -106,6 +109,32 @@
                         <ion-button id="detail-delete" fill="outline">Kustuta</ion-button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Seaded: personaalsed sätted + andmete eksport/import -->
+            <div id="settings-view" class="ion-hide settings">
+                <h2 class="settings-heading">Personaalsed sätted</h2>
+
+                <ion-input id="set-name" label="Kasutaja nimi" label-placement="stacked" fill="outline"
+                    placeholder="Sinu nimi"></ion-input>
+
+                <ion-select id="set-folder" label="Vaikimisi kaust" label-placement="stacked" fill="outline"
+                    interface="popover"></ion-select>
+
+                <ion-range id="set-font" label="Tekstisuurus" label-placement="stacked" min="12" max="22" step="1"
+                    pin="true" snaps="true"></ion-range>
+
+                <ion-toggle id="set-autoclear" justify="space-between">Tühjenda mustand pärast salvestamist</ion-toggle>
+
+                <ion-button id="set-save" expand="block">Salvesta sätted</ion-button>
+
+                <h2 class="settings-heading">Märkmete salvestamine failina</h2>
+                <p class="settings-hint">Fail salvestatakse telefoni kausta Documents/SpeechNotes.</p>
+
+                <ion-button id="export-btn" expand="block" fill="outline">Ekspordi märkmed failina</ion-button>
+                <ion-button id="import-btn" expand="block" fill="outline">Impordi viimane eksport</ion-button>
+
+                <p id="settings-status" class="settings-status"></p>
             </div>
 
             <div id="ar-view" class="ion-hide" style="position:absolute; inset:0; z-index:5;">

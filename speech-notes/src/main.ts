@@ -1,4 +1,4 @@
-import { defineCustomElements } from '@ionic/core/loader';
+﻿import { defineCustomElements } from '@ionic/core/loader';
 defineCustomElements(window);
 
 import '@ionic/core/css/core.css';
@@ -14,6 +14,7 @@ import { alertController } from '@ionic/core';
 import { addIcons } from 'ionicons';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { Preferences } from '@capacitor/preferences';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import {
   mic, stop, search, trash, personCircle, folderOpenOutline, chevronBack,
@@ -35,11 +36,23 @@ interface Note {
   folderId?: number | null;
 }
 
+interface Settings {
+  userName: string;
+  defaultFolderId: number | null;
+  fontSize: number;
+  autoClear: boolean;
+}
+
 const KEY = 'notes';
 const FOLDERS_KEY = 'folders';
+const SETTINGS_KEY = 'settings';
+const EXPORT_DIR = 'SpeechNotes';
+const EXPORT_JSON = `${EXPORT_DIR}/markmed.json`;
+const EXPORT_TXT = `${EXPORT_DIR}/markmed.txt`;
 
 let notes: Note[] = [];
 let folders: Folder[] = [];
+let settings: Settings = { userName: '', defaultFolderId: null, fontSize: 14, autoClear: true };
 let recording = false;
 let editingId: number | null = null;
 let activeFolderId: number | null = null; // folder filter in the notes list
@@ -58,6 +71,7 @@ const filterBar = document.getElementById('filter-bar')!;
 const filterLabel = document.getElementById('filter-label')!;
 const recordFab = document.getElementById('record-fab')!;
 const folderFab = document.getElementById('folder-fab')!;
+const appTitle = document.getElementById('app-title')!;
 
 let openNote: Note | null = null;
 
@@ -65,6 +79,7 @@ const segment = document.getElementById('view-segment') as HTMLIonSegmentElement
 const notesView = document.getElementById('notes-view')!;
 const foldersView = document.getElementById('folders-view')!;
 const detailView = document.getElementById('detail-view')!;
+const settingsView = document.getElementById('settings-view')!;
 const arView = document.getElementById("ar-view")!;
 const arModeSegment = document.getElementById('ar-mode-segment') as HTMLIonSegmentElement;
 const arFrame = document.getElementById('ar-frame') as HTMLIFrameElement;
@@ -73,25 +88,30 @@ const segmentToolbar = document.querySelector('.segment-toolbar')!;
 let searchQuery = '';
 const searchbar = document.getElementById("search-bar") as HTMLIonSearchbarElement
 
-function showView(view: 'notes' | 'folders' | 'detail' | 'augmentedReality') {
+function showView(view: 'notes' | 'folders' | 'detail' | 'augmentedReality' | 'settings') {
   notesView.classList.toggle('ion-hide', view !== 'notes');
   foldersView.classList.toggle('ion-hide', view !== 'folders');
   detailView.classList.toggle('ion-hide', view !== 'detail');
   arView.classList.toggle('ion-hide', view !== 'augmentedReality');
+  settingsView.classList.toggle('ion-hide', view !== 'settings');
   segmentToolbar.classList.toggle('ion-hide', view === 'detail');
   // folders tab: "Lisa kaust" button instead of the record button
-  recordFab.classList.toggle('ion-hide', view === 'folders' || view === 'augmentedReality');
+  recordFab.classList.toggle('ion-hide', view === 'folders' || view === 'augmentedReality' || view === 'settings');
   folderFab.classList.toggle('ion-hide', view !== 'folders');
   searchbar.value = ""
 }
 
 segment.addEventListener('ionChange', (ev: any) => {
-  showView(ev.detail.value === 'folders' ? 'folders'
-    : ev.detail.value === 'augmented-reality' ? 'augmentedReality' 
-    : 'notes'
+  const v = ev.detail.value;
+  showView(
+    v === 'folders' ? 'folders'
+      : v === 'augmented-reality' ? 'augmentedReality'
+      : v === 'settings' ? 'settings'
+      : 'notes'
   );
+  if (v === 'settings') fillSettingsForm();
   // AR-vaatesse minnes värskenda märkmed, mis AR-lehele kaasa antakse
-  if (ev.detail.value === 'augmented-reality') setArMode(arMode);
+  if (v === 'augmented-reality') setArMode(arMode);
 });
 
 const arPageRoot = `${import.meta.env.BASE_URL}${import.meta.env.DEV ? 'src/ar/' : 'ar/'}`;
@@ -140,6 +160,151 @@ arOpenChrome.addEventListener('click', () => {
 document.getElementById('seg-notes')!.addEventListener('click', () => {
   setFilter(null);
 });
+
+/* ---------- Settings ---------- */
+
+const setName = document.getElementById('set-name') as HTMLIonInputElement;
+const setFolder = document.getElementById('set-folder') as HTMLIonSelectElement;
+const setFont = document.getElementById('set-font') as HTMLIonRangeElement;
+const setAutoClear = document.getElementById('set-autoclear') as HTMLIonToggleElement;
+const settingsStatus = document.getElementById('settings-status')!;
+
+// Kaust, mis valitakse redaktoris uue märkme jaoks: aktiivne filter, muidu vaikekaust
+function defaultPick(): number | null {
+  return activeFolderId ?? (folderName(settings.defaultFolderId) ? settings.defaultFolderId : null);
+}
+
+function applySettings() {
+  document.documentElement.style.setProperty('--note-font-size', `${settings.fontSize}px`);
+  appTitle.textContent = settings.userName ? `${settings.userName} märkmed` : 'Speech Notes';
+}
+
+function fillSettingsForm() {
+  setName.value = settings.userName;
+  setFont.value = settings.fontSize;
+  setAutoClear.checked = settings.autoClear;
+
+  setFolder.innerHTML = '';
+  const none = document.createElement('ion-select-option');
+  none.value = '';
+  none.textContent = 'Kaust puudub';
+  setFolder.appendChild(none);
+  for (const f of folders) {
+    const o = document.createElement('ion-select-option');
+    o.value = String(f.id);
+    o.textContent = f.name;
+    setFolder.appendChild(o);
+  }
+  setFolder.value = folderName(settings.defaultFolderId) ? String(settings.defaultFolderId) : '';
+  settingsStatus.textContent = '';
+}
+
+async function saveSettings() {
+  settings = {
+    userName: String(setName.value ?? '').trim(),
+    defaultFolderId: setFolder.value ? Number(setFolder.value) : null,
+    fontSize: Number(setFont.value) || 14,
+    autoClear: !!setAutoClear.checked,
+  };
+  await Preferences.set({ key: SETTINGS_KEY, value: JSON.stringify(settings) });
+  applySettings();
+  if (editingId === null) populateFolderSelect(defaultPick());
+  settingsStatus.textContent = 'Sätted salvestatud ✔';
+}
+
+function isSettings(x: any): x is Partial<Settings> {
+  return x !== null && typeof x === 'object' && !Array.isArray(x);
+}
+
+async function loadSettings() {
+  const { value } = await Preferences.get({ key: SETTINGS_KEY });
+  try {
+    const data: unknown = value ? JSON.parse(value) : null;
+    if (isSettings(data)) settings = { ...settings, ...data };
+  } catch {
+    /* vigane JSON -> vaikesätted */
+  }
+  applySettings();
+}
+
+document.getElementById('set-save')!.addEventListener('click', saveSettings);
+
+/* ---------- Export / import (fail telefoni mälus) ---------- */
+
+function notesAsText(): string {
+  return notes
+    .map((n) => `[${new Date(n.id).toLocaleString('et-EE')}] ${folderName(n.folderId) ?? '-'}\n${n.text}\n`)
+    .join('\n');
+}
+
+function browserDownload(name: string, mime: string, content: string) {
+  const a = document.createElement('a');
+  a.href = `data:${mime};charset=utf-8,` + encodeURIComponent(content);
+  a.download = name;
+  a.click();
+}
+
+async function exportNotes() {
+  const json = JSON.stringify({ notes, folders }, null, 2);
+  try {
+    if (Capacitor.isNativePlatform()) {
+      // JSON on taastamiseks (import), TXT on inimloetav versioon
+      await Filesystem.writeFile({
+        path: EXPORT_JSON,
+        data: json,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+        recursive: true,
+      });
+      const res = await Filesystem.writeFile({
+        path: EXPORT_TXT,
+        data: notesAsText(),
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+        recursive: true,
+      });
+      settingsStatus.textContent = `Salvestatud kausta Documents/${EXPORT_DIR} (${notes.length} märget)\n${res.uri}`;
+    } else {
+      browserDownload('markmed.json', 'application/json', json);
+      browserDownload('markmed.txt', 'text/plain', notesAsText());
+      settingsStatus.textContent = 'Failid laaditi alla (brauser)';
+    }
+  } catch (e: any) {
+    settingsStatus.textContent = 'Ekspordi viga: ' + (e?.message ?? e);
+  }
+}
+
+async function importNotes() {
+  if (!Capacitor.isNativePlatform()) {
+    settingsStatus.textContent = 'Import töötab ainult telefonis';
+    return;
+  }
+  try {
+    const res = await Filesystem.readFile({
+      path: EXPORT_JSON,
+      directory: Directory.Documents,
+      encoding: Encoding.UTF8,
+    });
+    const data = JSON.parse(res.data as string);
+    if (isNotes(data?.notes) && isFolders(data?.folders)) {
+      notes = data.notes;
+      folders = data.folders;
+      await Promise.all([save(), saveFolders()]);
+      populateFolderSelect(defaultPick());
+      render();
+      renderFolders();
+      fillSettingsForm();
+      settingsStatus.textContent = `Imporditud ${notes.length} märget ja ${folders.length} kausta`;
+    } else {
+      settingsStatus.textContent = 'Faili formaat on vale';
+    }
+  } catch (e: any) {
+    settingsStatus.textContent = 'Importi viga (kas eksporti on tehtud?): ' + (e?.message ?? e);
+  }
+}
+
+document.getElementById('export-btn')!.addEventListener('click', exportNotes);
+document.getElementById('import-btn')!.addEventListener('click', importNotes);
 
 /* ---------- Folders ---------- */
 
@@ -278,6 +443,10 @@ async function deleteFolder(f: Folder) {
           folders = folders.filter((x) => x.id !== f.id);
           notes = notes.map((n) => (n.folderId === f.id ? { ...n, folderId: null } : n));
           if (activeFolderId === f.id) setFilter(null);
+          if (settings.defaultFolderId === f.id) {
+            settings.defaultFolderId = null;
+            await Preferences.set({ key: SETTINGS_KEY, value: JSON.stringify(settings) });
+          }
           await Promise.all([saveFolders(), save()]);
           populateFolderSelect(selectedFolderId());
           renderFolders();
@@ -461,7 +630,8 @@ async function load() {
   } catch {
     folders = [];
   }
-  populateFolderSelect(null);
+  await loadSettings();
+  populateFolderSelect(defaultPick());
   render();
   renderFolders();
 }
@@ -485,7 +655,7 @@ function startWeb() {
   live.textContent = '';
   draft.value = '';
   editingId = null;
-  populateFolderSelect(activeFolderId);
+  populateFolderSelect(defaultPick());
   webRec = new Ctor();
   webRec.lang = 'et-EE';
   webRec.continuous = true;
@@ -519,7 +689,7 @@ async function start() {
   live.textContent = '';
   draft.value = '';
   editingId = null;
-  populateFolderSelect(activeFolderId);
+  populateFolderSelect(defaultPick());
   await SpeechRecognition.removeAllListeners();
   await SpeechRecognition.addListener('partialResults', (data) => {
     draft.value = data.matches?.[0] ?? '';
@@ -567,8 +737,9 @@ async function saveDraft() {
     notes.unshift({ id: Date.now(), text, folderId });
   }
   editingId = null;
-  draft.value = '';
-  populateFolderSelect(activeFolderId);
+  // säte: kas mustand tühjendatakse pärast salvestamist
+  if (settings.autoClear) draft.value = '';
+  populateFolderSelect(defaultPick());
   await save();
   render();
   renderFolders();
@@ -596,7 +767,7 @@ document.getElementById('save-btn')!.addEventListener('click', saveDraft);
 document.getElementById('cancel-btn')!.addEventListener('click', () => {
   editingId = null;
   draft.value = '';
-  populateFolderSelect(activeFolderId);
+  populateFolderSelect(defaultPick());
 });
 
 document.getElementById('clear-btn')!.addEventListener('click', async () => {

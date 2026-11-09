@@ -482,3 +482,61 @@ ion-fab ion-button.button-solid {
   --border-radius: 8px;
   --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+
+
+/* Seadete vaade */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 16px 96px;
+}
+
+.settings-heading {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.settings-hint {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: #666666;
+}
+
+.settings-status {
+  margin: 0;
+  font-size: 13px;
+  color: #000000;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.settings ion-input,
+.settings ion-select {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+.settings ion-range {
+  --bar-background: #cfcfcf;
+  --bar-background-active: #000000;
+  --knob-background: #000000;
+  --pin-background: #000000;
+  --pin-color: #ffffff;
+}
+
+.settings ion-toggle {
+  --track-background-checked: #000000;
+  --handle-background-checked: #ffffff;
+}
+
+/* Tekstisuurus sätetest */
+ion-card.note-card p {
+  font-size: var(--note-font-size, 14px);
+}
+
+/* Segment mahub 4 nuppu: kerib külgsuunas */
+ion-segment[scrollable] ion-segment-button {
+  min-width: 120px;
+}
