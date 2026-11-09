@@ -53,3 +53,22 @@ Kontrollimiseks saab muuta seadeid, lisada märkme, rakenduse sulgeda ja uuesti 
 - Capacitor – veebirakenduse ühendamine Androidi ja iOS-i natiivsete võimalustega.
 - @capacitor/preferences – sätete, märkmete ja kaustade lokaalne salvestamine.
 - @capacitor/filesystem – JSON- ja TXT-failide kirjutamine ning lugemine telefoni mälust.
+
+## 8. Mis osutus lihtsaks ja mis keeruliseks?
+Lihtsam osa oli sätete ja märkmete salvestamine Preferences'i abil. Andmete salvestamiseks ja lugemiseks on olemas valmis funktsioonid ning rakenduses saab kasutada eraldi võtmeid erinevate andmete jaoks.
+
+Keerulisem osa oli failide eksportimise ja importimise korraldamine. tuli arvestada, et mobiilirakenduses ja veebibrauseris toimub failide salvestamine erinevalt. Samuti tuli tagada, et imporditava JSON-faili struktuur oleks õige ning vigase faili korral ei prooviks rakendus sobimatuid andmeid kasutada.
+
+Teine oluline tähelepanek oli eristada rakenduse sisemist salvestust ja failina eksportimist. Preferences'i salvestatud andmed on rakenduse enda kasutuseks, TXT- ja JSON-failid aga võimaldavad märkmeid eraldi failidena säilitada.
+
+## 9. Kasutatud allikad
+1. Capacitor – Preferences Plugin API. Kasutatakse võtme-väärtuse kujul andmete lokaalseks salvestamiseks ja lugemiseks (Preferences.set() ja Preferences.get()).
+   https://capacitorjs.com/docs/apis/preferences
+2. Capacitor – Filesystem Plugin API. Failide loomise, kirjutamise, lugemise ja seadme failisüsteemis kasutamise dokumentatsioon.
+   https://capacitorjs.com/docs/apis/filesystem
+3. Ionic Framework – Documentation. Ionicu kasutajaliidese komponentide ja rakenduse ülesehituse dokumentatsioon.
+   https://ionicframework.com/docs
+4. Capacitor – Documentation. Capacitori üldine dokumentatsioon, mis selgitab veebitehnoloogiatel põhineva rakenduse ühendamist Androidi ja iOS-i natiivsete võimalustega.
+   https://capacitorjs.com/docs
+5. TypeScript – The TypeScript Handbook. TypeScripti keele ja tüüpide kasutamise juhend.
+   https://www.typescriptlang.org/docs/handbook/intro.html
