@@ -30,8 +30,8 @@ interface Folder {
   name: string;
 }
 
-interface Note {
-  id: number;
+export interface Note {
+  id?: number;
   text: string;
   folderId?: number | null;
 }
@@ -544,6 +544,25 @@ async function translateNote(text: string): Promise<string> {
   return data.responseData.translatedText;
 }
 
+async function testPostNote(payload: Note) {
+  const res = await fetch(`https://jsonplaceholder.typicode.com/todos`, {
+      method: 'POST',
+      body: JSON.stringify({
+          id: payload.id,
+          name: payload.text,
+          folderId: payload.folderId
+      }),
+      headers: {
+          'Content-type': 'application/json; charset=UTF-8',
+      },
+  });
+  if (!res.ok) {
+    throw new Error(`Ei saanud märkust salvestada serverisse: ${res.status}`);
+  }
+  const data = await res.json();
+  return data;
+}
+
 function openDetail(n: Note) {
   openNote = n;
   const firstLine = n.text.split(/[.!?\n]/)[0].trim();
@@ -565,7 +584,6 @@ document.getElementById('detail-delete')!.addEventListener('click', () => {
   showView('notes');
   if (openNote) deleteNote(openNote);
 });
-
 const translateBtn = document.getElementById('detail-translate')!;
 
 translateBtn.addEventListener('click', async () => {
@@ -583,6 +601,29 @@ translateBtn.addEventListener('click', async () => {
     setLoading(translateBtn, false, 'Tõlgi inglise keelde');
   }
 });
+
+const backupBtn = document.getElementById('detail-backup')!
+backupBtn.addEventListener('click', async () => {
+  if (!openNote) return;
+  setLoading(backupBtn, true, 'Varusta serverisse');
+  try {
+    const payload: Note = {
+      text: openNote.text,
+      folderId: openNote.folderId
+    }
+    const data = await testPostNote(payload);
+    console.log(data);
+    showToast("Märkus salvestatud serverisse!", "success");
+  }
+  catch (err) {
+    console.error("Serverisse salvestamine ebaõnnestus", err);
+    showToast('Serverisse salvestamine ebaõnnestus', 'danger');
+  }
+  finally {
+    setLoading(backupBtn, false, 'Varusta serverisse');
+  }
+})
+
 
 function render() {
   list.innerHTML = '';
